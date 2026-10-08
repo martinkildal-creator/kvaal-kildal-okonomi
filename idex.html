@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kvaal Kildal økonomi</title>
+<meta name="description" content="Se hva x prosent årlig avkastning betyr for sparepengene dine over tid.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f3ee;
+    --card: #ffffff;
+    --text: #1d2226;
+    --muted: #63707a;
+    --line: #e3dfd6;
+    --accent: #1f6f5c;
+    --accent-soft: #d8ebe5;
+    --gold: #c8973a;
+    --gold-soft: #f4e6c8;
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12171a;
+      --card: #1b2226;
+      --text: #eef1f2;
+      --muted: #9aa7ae;
+      --line: #2c363b;
+      --accent: #4fbf9f;
+      --accent-soft: #1d3a33;
+      --gold: #e2b65c;
+      --gold-soft: #3b3220;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 20px 16px calc(32px + env(safe-area-inset-bottom));
+  }
+  header { padding: 12px 0 8px; }
+  h1 {
+    font-size: 1.75rem;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
+  }
+  h1 span { color: var(--accent); }
+  .lead { color: var(--muted); margin: 0; font-size: 0.98rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 14px;
+  }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  .field-top {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    margin-bottom: 6px;
+  }
+  label { font-weight: 600; font-size: 0.95rem; }
+  .num {
+    width: 128px;
+    font-size: 16px; /* hindrer zoom på iPhone */
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+    text-align: right;
+  }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
+  .hint { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+  .answer {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+  }
+  .answer .big { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+  .answer p { margin: 8px 0 0; opacity: 0.95; }
+  @media (prefers-color-scheme: dark) { .answer { color: #0f1a17; } }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .stat .k { font-size: 0.78rem; color: var(--muted); }
+  .stat .v { font-size: 1.1rem; font-weight: 700; margin-top: 2px; word-break: break-word; }
+
+  .chart-box { position: relative; height: 260px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); margin-top: 10px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { padding: 9px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem; }
+  tr:last-child td { border-bottom: none; font-weight: 700; }
+
+  .explain p { margin: 0 0 10px; }
+  .explain p:last-child { margin-bottom: 0; }
+  footer { text-align: center; color: var(--muted); font-size: 0.78rem; margin-top: 24px; }
+
+  @media (min-width: 600px) {
+    h1 { font-size: 2.2rem; }
+    .chart-box { height: 320px; }
+    .stats { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Kvaal Kildal <span>økonomi</span></h1>
+    <p class="lead">Hva betyr egentlig x % årlig avkastning? Se hvordan rentes rente får pengene til å vokse over tid.</p>
+  </header>
+
+  <section class="card">
+    <h2>Dine tall</h2>
+
+    <div class="field">
+      <div class="field-top">
+        <label for="rate">Årlig avkastning (%)</label>
+        <input class="num" id="rate" type="number" inputmode="decimal" step="0.5" placeholder="10" value="10">
+      </div>
+      <input id="rateR" type="range" min="0" max="25" step="0.5" value="10" aria-label="Årlig avkastning">
+      <div class="hint">Tomt felt = 10 %</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <label for="years">Antall år</label>
+        <input class="num" id="years" type="number" inputmode="numeric" step="1" placeholder="30" value="30">
+      </div>
+      <input id="yearsR" type="range" min="1" max="60" step="1" value="30" aria-label="Antall år">
+      <div class="hint">Tomt felt = 30 år</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <label for="start">Startbeløp (kr)</label>
+        <input class="num" id="start" type="number" inputmode="numeric" step="1000" value="100000">
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <label for="monthly">Månedlig sparing (kr)</label>
+        <input class="num" id="monthly" type="number" inputmode="numeric" step="100" value="1000">
+      </div>
+    </div>
+  </section>
+
+  <section class="card answer">
+    <div id="answerBig" class="big">–</div>
+    <p id="answerText"></p>
+  </section>
+
+  <section class="card">
+    <div class="stats">
+      <div class="stat"><div class="k">Sluttverdi</div><div class="v" id="sEnd">–</div></div>
+      <div class="stat"><div class="k">Du har satt inn</div><div class="v" id="sIn">–</div></div>
+      <div class="stat"><div class="k">Avkastning</div><div class="v" id="sGain">–</div></div>
+      <div class="stat"><div class="k">Pengene dobles hvert</div><div class="v" id="sDbl">–</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Utvikling år for år</h2>
+    <div class="chart-box"><canvas id="barChart" aria-label="Stolpediagram over innskudd og avkastning per år"></canvas></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--gold)"></i>Innskudd</span>
+      <span><i class="dot" style="background:var(--accent)"></i>Avkastning</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Verdi over tid</h2>
+    <div class="chart-box"><canvas id="lineChart" aria-label="Linjediagram over total verdi"></canvas></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--accent)"></i>Med avkastning</span>
+      <span><i class="dot" style="background:var(--gold)"></i>Uten avkastning (0 %)</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Milepæler</h2>
+    <table>
+      <thead><tr><th>År</th><th>Innskudd</th><th>Avkastning</th><th>Verdi</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </section>
+
+  <section class="card explain">
+    <h2>Slik skal du lese det</h2>
+    <p id="explain1"></p>
+    <p><strong>Rentes rente:</strong> Avkastningen gir selv avkastning neste år. Derfor går kurven sakte i starten og bratt mot slutten – mesteparten av veksten kommer de siste årene.</p>
+    <p><strong>72-regelen:</strong> Del 72 på avkastningen for å finne omtrent hvor mange år det tar å doble pengene. 72 / 10 % ≈ 7,2 år.</p>
+    <p class="hint">Beregningen forutsetter jevn årlig avkastning, at månedssparingen legges inn ved slutten av hvert år, og tar ikke hensyn til skatt, gebyrer eller inflasjon. Historisk avkastning er ingen garanti for fremtiden.</p>
+  </section>
+
+  <footer>© Kvaal Kildal økonomi</footer>
+</div>
+
+<script>
+(function () {
+  var DEFAULT_RATE = 10, DEFAULT_YEARS = 30;
+  var $ = function (id) { return document.getElementById(id); };
+  var nf = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 });
+  var nf2 = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+  var nf1 = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 1 });
+  function kr(v) { return nf.format(Math.round(v)) + ' kr'; }
+  function krShort(v) {
+    var a = Math.abs(v);
+    if (a >= 1e6) return nf1.format(v / 1e6) + ' mill';
+    if (a >= 1e3) return nf.format(v / 1e3) + 'k';
+    return nf.format(v);
+  }
+  function num(el, fallback) {
+    var s = String(el.value).replace(',', '.').trim();
+    var v = parseFloat(s);
+    return (s === '' || !isFinite(v)) ? fallback : v;
+  }
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function calc() {
+    var r = num($('rate'), DEFAULT_RATE);
+    r = Math.max(-50, Math.min(100, r));
+    var n = Math.round(num($('years'), DEFAULT_YEARS));
+    n = Math.max(1, Math.min(100, n));
+    var P = Math.max(0, num($('start'), 0));
+    var M = Math.max(0, num($('monthly'), 0));
+
+    var labels = [], values = [], contribs = [], gains = [];
+    var v = P, c = P;
+    labels.push('0'); values.push(v); contribs.push(c); gains.push(0);
+    for (var y = 1; y <= n; y++) {
+      v = v * (1 + r / 100) + 12 * M;
+      c += 12 * M;
+      labels.push(String(y)); values.push(v); contribs.push(c); gains.push(v - c);
+    }
+    return { r: r, n: n, P: P, M: M, labels: labels, values: values, contribs: contribs, gains: gains };
+  }
+
+  var barChart, lineChart;
+
+  function axisOpts() {
+    var muted = css('--muted'), grid = css('--line');
+    return {
+      x: { stacked: true, grid: { display: false }, ticks: { color: muted, maxTicksLimit: 7, maxRotation: 0 },
+           title: { display: true, text: 'År', color: muted } },
+      y: { stacked: true, grid: { color: grid }, ticks: { color: muted, maxTicksLimit: 6, callback: function (v) { return krShort(v); } } }
+    };
+  }
+  function tooltip() {
+    return { callbacks: { title: function (i) { return 'År ' + i[0].label; },
+                          label: function (c) { return ' ' + c.dataset.label + ': ' + kr(c.parsed.y); } } };
+  }
+
+  function initCharts(d) {
+    var accent = css('--accent'), gold = css('--gold'), goldSoft = css('--gold-soft'), accentSoft = css('--accent-soft');
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+
+    barChart = new Chart($('barChart'), {
+      type: 'bar',
+      data: { labels: d.labels, datasets: [
+        { label: 'Innskudd', data: d.contribs, backgroundColor: gold, borderRadius: 3, stack: 's' },
+        { label: 'Avkastning', data: d.gains, backgroundColor: accent, borderRadius: 3, stack: 's' }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false }, tooltip: tooltip() }, scales: axisOpts() }
+    });
+
+    var lineScales = axisOpts(); lineScales.x.stacked = false; lineScales.y.stacked = false;
+    lineChart = new Chart($('lineChart'), {
+      type: 'line',
+      data: { labels: d.labels, datasets: [
+        { label: 'Med avkastning', data: d.values, borderColor: accent, backgroundColor: accentSoft,
+          fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 5, borderWidth: 3 },
+        { label: 'Uten avkastning', data: d.contribs, borderColor: gold, backgroundColor: goldSoft,
+          fill: false, tension: 0, pointRadius: 0, pointHoverRadius: 5, borderWidth: 2, borderDash: [6, 4] }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false }, tooltip: tooltip() }, scales: lineScales }
+    });
+  }
+
+  function render() {
+    var d = calc();
+    var end = d.values[d.n], inn = d.contribs[d.n], gain = end - inn;
+    var factor = Math.pow(1 + d.r / 100, d.n);
+    var dbl = d.r > 0 ? Math.log(2) / Math.log(1 + d.r / 100) : null;
+
+    $('answerBig').textContent = '1 kr → ' + nf2.format(factor) + ' kr';
+    $('answerText').textContent = d.r + ' % årlig avkastning i ' + d.n + ' år betyr at hver krone du investerer i dag blir til ' +
+      nf2.format(factor) + ' kr. Det er en total vekst på ' + nf.format((factor - 1) * 100) + ' %.';
+
+    $('sEnd').textContent = kr(end);
+    $('sIn').textContent = kr(inn);
+    $('sGain').textContent = kr(gain);
+    $('sDbl').textContent = dbl ? nf1.format(dbl) + ' år' : '–';
+
+    var share = end > 0 ? Math.round(gain / end * 100) : 0;
+    $('explain1').innerHTML = 'Med <strong>' + d.r + ' %</strong> avkastning i <strong>' + d.n + ' år</strong> ender du på <strong>' + kr(end) +
+      '</strong>. Du har selv satt inn ' + kr(inn) + ', mens <strong>' + share + ' %</strong> av sluttverdien er ren avkastning.';
+
+    // milepæler
+    var marks = [1, 5, 10, 15, 20, 25, 30, 40, 50, 60].filter(function (y) { return y < d.n; });
+    if (marks.length > 5) marks = marks.slice(marks.length - 5);
+    marks.push(d.n);
+    $('tbody').innerHTML = marks.map(function (y) {
+      return '<tr><td>' + y + '</td><td>' + krShort(d.contribs[y]) + '</td><td>' + krShort(d.gains[y]) + '</td><td>' + krShort(d.values[y]) + '</td></tr>';
+    }).join('');
+
+    if (!window.Chart) return;
+    if (!barChart) { initCharts(d); return; }
+    barChart.data.labels = d.labels;
+    barChart.data.datasets[0].data = d.contribs;
+    barChart.data.datasets[1].data = d.gains;
+    barChart.update();
+    lineChart.data.labels = d.labels;
+    lineChart.data.datasets[0].data = d.values;
+    lineChart.data.datasets[1].data = d.contribs;
+    lineChart.update();
+  }
+
+  function link(numId, rangeId) {
+    var n = $(numId), r = $(rangeId);
+    n.addEventListener('input', function () { if (n.value !== '') r.value = n.value; render(); });
+    r.addEventListener('input', function () { n.value = r.value; render(); });
+  }
+  link('rate', 'rateR');
+  link('years', 'yearsR');
+  $('start').addEventListener('input', render);
+  $('monthly').addEventListener('input', render);
+
+  // Les fra URL, f.eks. ?r=8&y=20
+  try {
+    var q = new URLSearchParams(location.search);
+    if (q.get('r')) { $('rate').value = q.get('r'); $('rateR').value = q.get('r'); }
+    if (q.get('y')) { $('years').value = q.get('y'); $('yearsR').value = q.get('y'); }
+  } catch (e) {}
+
+  render();
+})();
+</script>
+</body>
+</html>
